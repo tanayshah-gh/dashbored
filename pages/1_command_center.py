@@ -95,12 +95,14 @@ with d_col1:
     st.subheader("Deadlines")
 with d_col2:
     with st.popover("Add"):
-        new_title = st.text_input("Assignment / Task", placeholder="e.g., C Pointers Lab")
-        new_subject = st.text_input("Subject", placeholder="e.g., DSA / AIML")
-        new_due = st.text_input("Due Date", placeholder="e.g., Friday or 28 Aug")
-        new_status = st.selectbox("Status", ["🟡 pending", "🔵 in prog", "🟢 done"])
-        if st.button("Add Deadline", width="stretch", key="add_deadline_btn"):
-            if new_title.strip():
+        with st.form("add_deadline_form", clear_on_submit=True):
+            new_title = st.text_input("Assignment / Task", placeholder="e.g., C Pointers Lab")
+            new_subject = st.text_input("Subject", placeholder="e.g., DSA / AIML")
+            new_due = st.text_input("Due Date", placeholder="e.g., Friday or 28 Aug")
+            new_status = st.selectbox("Status", ["🟡 pending", "🔵 in prog", "🟢 done"])
+            submitted = st.form_submit_button("Add Deadline", width="stretch")
+            
+            if submitted and new_title.strip():
                 new_row = pd.DataFrame([{
                     "task": new_title.strip(),
                     "subject": new_subject.strip() if new_subject.strip() else "General",
@@ -110,7 +112,6 @@ with d_col2:
                 st.session_state.deadlines_df = pd.concat([st.session_state.deadlines_df, new_row], ignore_index=True)
                 persist_sheet("work_deadlines", st.session_state.deadlines_df)
                 st.rerun()
-
 if not st.session_state.deadlines_df.empty:
     edited_deadlines = st.data_editor(
         st.session_state.deadlines_df,
