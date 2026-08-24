@@ -13,17 +13,18 @@ st.divider()
 # 2. Establish Google Sheets Connection
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Helper function to safely read sheets
+# Helper function with 5-minute cache to prevent 429 quota exhaustion
+@st.cache_data(ttl=300)
 def load_data(worksheet_name, default_cols):
     try:
-        df = conn.read(worksheet=worksheet_name, ttl=0)
-        if df.empty or df is None:
+        df = conn.read(worksheet=worksheet_name, ttl=300)
+        if df is None or df.empty:
             return pd.DataFrame(columns=default_cols)
         return df.dropna(how="all")
     except Exception:
         return pd.DataFrame(columns=default_cols)
 
-# Load data from sheets (all lowercase columns)
+# Load data from sheets
 tasks_df = load_data("work_tasks", ["id", "text", "done"])
 deadlines_df = load_data("work_deadlines", ["task", "subject", "due", "status"])
 notes_df = load_data("work_notes", ["note"])
@@ -33,6 +34,12 @@ if not tasks_df.empty:
     tasks_df["done"] = tasks_df["done"].astype(bool)
 if not deadlines_df.empty:
     deadlines_df = deadlines_df.fillna("")
+
+# Helper to sync and clear cache instantly
+def sync_update(worksheet_name, df):
+    conn.update(worksheet=worksheet_name, data=df)
+    st.cache_data.clear()
+    st.rerun()
 
 # ==================== SECTION 1: TODAY'S FOCUS ====================
 h_col1, h_col2 = st.columns([6, 1])
@@ -46,15 +53,14 @@ with h_col2:
                 new_id = int(tasks_df["id"].max() + 1) if not tasks_df.empty and tasks_df["id"].notna().any() else 1
                 new_row = pd.DataFrame([{"id": new_id, "text": new_task_text.strip(), "done": False}])
                 tasks_df = pd.concat([tasks_df, new_row], ignore_index=True)
-                conn.update(worksheet="work_tasks", data=tasks_df)
-                st.rerun()
+                sync_update("work_tasks", tasks_df)
 
 st.caption("quick focus")
 
 if tasks_df.empty:
     st.info("No tasks left for today!")
 else:
-    # Auto-sort: Incomplete tasks at the top, completed at the bottom
+    # Auto-sort: Incomplete tasks at top, completed at bottom
     tasks_df = tasks_df.sort_values(by="done", ascending=True).reset_index(drop=True)
     
     for idx, row in tasks_df.iterrows():
@@ -64,14 +70,12 @@ else:
             is_done = st.checkbox(label, value=bool(row["done"]), key=f"task_chk_{row['id']}")
             if is_done != row["done"]:
                 tasks_df.at[idx, "done"] = is_done
-                conn.update(worksheet="work_tasks", data=tasks_df)
-                st.rerun()
+                sync_update("work_tasks", tasks_df)
 
         with t_col2:
             if st.button("✕", key=f"del_task_{row['id']}", help="Delete task"):
                 tasks_df = tasks_df.drop(idx).reset_index(drop=True)
-                conn.update(worksheet="work_tasks", data=tasks_df)
-                st.rerun()
+                sync_update("work_tasks", tasks_df)
 
 st.divider()
 
@@ -94,8 +98,7 @@ with d_col2:
                     "status": new_status
                 }])
                 deadlines_df = pd.concat([deadlines_df, new_row], ignore_index=True)
-                conn.update(worksheet="work_deadlines", data=deadlines_df)
-                st.rerun()
+                sync_update("work_deadlines", deadlines_df)
 
 if not deadlines_df.empty:
     edited_deadlines = st.data_editor(
@@ -115,13 +118,11 @@ if not deadlines_df.empty:
     )
 
     if not edited_deadlines.equals(deadlines_df):
-        conn.update(worksheet="work_deadlines", data=edited_deadlines)
-        st.rerun()
+        sync_update("work_deadlines", edited_deadlines)
 
     if st.button("Clear Finished Deadlines", key="clear_deadlines"):
         deadlines_df = deadlines_df[~deadlines_df["status"].str.contains("done", case=False, na=False)].reset_index(drop=True)
-        conn.update(worksheet="work_deadlines", data=deadlines_df)
-        st.rerun()
+        sync_update("work_deadlines", deadlines_df)
 else:
     st.info("No upcoming deadlines.")
 
@@ -141,8 +142,7 @@ with st.form("quick_capture_form", clear_on_submit=True):
     if submitted and quick_note.strip():
         new_row = pd.DataFrame([{"note": quick_note.strip()}])
         notes_df = pd.concat([notes_df, new_row], ignore_index=True)
-        conn.update(worksheet="work_notes", data=notes_df)
-        st.rerun()
+        sync_update("work_notes", notes_df)
 
 if not notes_df.empty:
     with st.expander("Saved Notes", expanded=False):
@@ -150,8 +150,7 @@ if not notes_df.empty:
             st.write(f"• {note}")
         if st.button("Clear Notes", type="secondary"):
             empty_df = pd.DataFrame(columns=["note"])
-            conn.update(worksheet="work_notes", data=empty_df)
-            st.rerun()
+            sync_update("work_notes", empty_df)
 
 st.divider()
 
