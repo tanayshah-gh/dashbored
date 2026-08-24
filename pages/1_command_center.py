@@ -14,10 +14,10 @@ st.divider()
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # Helper function to load initial data with caching
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def load_data(worksheet_name, default_cols):
     try:
-        df = conn.read(worksheet=worksheet_name, ttl=300)
+        df = conn.read(worksheet=worksheet_name, ttl=60)
         if df is None or df.empty:
             return pd.DataFrame(columns=default_cols)
         return df.dropna(how="all")
