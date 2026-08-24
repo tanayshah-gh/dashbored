@@ -33,7 +33,7 @@ with h_col1:
 with h_col2:
     with st.popover("Add"):
         new_task_text = st.text_input("New Focus Item", placeholder="e.g., Debug parser")
-        if st.button("Add Task", use_container_width=True, key="add_focus_btn"):
+        if st.button("Add Task", width="stretch", key="add_focus_btn"):
             if new_task_text.strip():
                 st.session_state.today_tasks.append({
                     "id": len(st.session_state.today_tasks) + 1,
@@ -80,7 +80,7 @@ with d_col2:
         new_subject = st.text_input("Subject", placeholder="e.g., DSA / AIML")
         new_due = st.text_input("Due Date", placeholder="e.g., Friday or 28 Aug")
         new_status = st.selectbox("Status", ["🟡 pending", "🔵 in prog", "🟢 done"])
-        if st.button("Add Deadline", use_container_width=True, key="add_deadline_btn"):
+        if st.button("Add Deadline", width="stretch", key="add_deadline_btn"):
             if new_title.strip():
                 st.session_state.deadlines.append({
                     "Task": new_title.strip(),
@@ -91,7 +91,7 @@ with d_col2:
                 st.rerun()
 
 if st.session_state.deadlines:
-    updated_deadlines = st.data_editor(
+    edited_deadlines = st.data_editor(
         st.session_state.deadlines,
         column_config={
             "Status": st.column_config.SelectboxColumn(
@@ -101,15 +101,19 @@ if st.session_state.deadlines:
                 required=True,
             )
         },
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
         num_rows="dynamic",
         key="deadlines_editor"
     )
-    st.session_state.deadlines = updated_deadlines
+    
+    # Sync inline table edits immediately to session state
+    if edited_deadlines != st.session_state.deadlines:
+        st.session_state.deadlines = edited_deadlines
+        st.rerun()
 
     if st.button("Clear Finished Deadlines", key="clear_deadlines"):
-        st.session_state.deadlines = [d for d in st.session_state.deadlines if "Ready" not in d["Status"]]
+        st.session_state.deadlines = [d for d in st.session_state.deadlines if "done" not in d.get("Status", "")]
         st.rerun()
 else:
     st.info("No upcoming deadlines.")
@@ -118,15 +122,18 @@ st.divider()
 
 # ==================== SECTION 3: QUICK CAPTURE ====================
 st.subheader("Quick Capture")
-quick_note = st.text_area(
-    "",
-    placeholder="e.g., paid by cash, owe money etc...",
-    height=100
-)
-if st.button("Save", use_container_width=True):
-    if quick_note.strip():
+
+with st.form("quick_capture_form", clear_on_submit=True):
+    quick_note = st.text_area(
+        "quick capture input",
+        placeholder="e.g., paid by cash, owe money etc... (Ctrl+Enter to save)",
+        height=100,
+        label_visibility="collapsed"
+    )
+    submitted = st.form_submit_button("Save", width="stretch")
+    if submitted and quick_note.strip():
         st.session_state.quick_notes.append(f"• {quick_note.strip()}")
-        st.success("Note captured!")
+        st.rerun()
 
 if st.session_state.quick_notes:
     with st.expander("Saved Notes", expanded=False):
@@ -144,10 +151,10 @@ st.caption("favourited links")
 
 c1, c2, c3, c4 = st.columns(4)
 with c1:
-    st.link_button("📂 C & DSA Practice", "https://github.com", use_container_width=True)
+    st.link_button("📂 C & DSA Practice", "https://github.com", width="stretch")
 with c2:
-    st.link_button("🛡️ Argus Scanner Repo", "https://github.com", use_container_width=True)
+    st.link_button("🛡️ Argus Scanner Repo", "https://github.com", width="stretch")
 with c3:
-    st.link_button("🔐 Bastion Vault Dev", "https://github.com", use_container_width=True)
+    st.link_button("🔐 Bastion Vault Dev", "https://github.com", width="stretch")
 with c4:
-    st.link_button("🌐 Portfolio Config", "https://github.com", use_container_width=True)
+    st.link_button("🌐 Portfolio Config", "https://github.com", width="stretch")
